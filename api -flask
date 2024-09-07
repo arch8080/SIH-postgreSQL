@@ -1,0 +1,55 @@
+from flask import Flask, request, jsonify
+import psycopg2
+
+app = Flask(__name__)
+
+# Connect to your PostgreSQL database
+def connect_db():
+    try:
+        conn = psycopg2.connect(
+            database="alumni_platform",
+            user="your_user",
+            password="your_password",
+            host="localhost",
+            port="5432"
+        )
+        return conn
+    except Exception as e:
+        print(f"Error connecting to database: {e}")
+        return None
+
+@app.route('/register_student', methods=['POST'])
+def register_student():
+    data = request.json
+    conn = connect_db()
+    if conn:
+        cursor = conn.cursor()
+        try:
+            query = """
+            INSERT INTO Students (name, email, phone, department, year_of_study, interests, career_goals)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            RETURNING student_id;
+            """
+            cursor.execute(query, (
+                data['name'],
+                data['email'],
+                data['phone'],
+                data['department'],
+                data['year_of_study'],
+                data['interests'],
+                data['career_goals']
+            ))
+            student_id = cursor.fetchone()[0]
+            conn.commit()
+            return jsonify({'student_id': student_id}), 201
+        except Exception as e:
+            conn.rollback()
+            return jsonify({'error': str(e)}), 400
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+if __name__ == '__main__':
+    app.run(debug=True)
